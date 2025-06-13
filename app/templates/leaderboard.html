@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Leaderboard - 304Tracker</title>
+</head>
+<body>
+    {% include 'base.html' %}
+    <div class="container">
+        <h1>Leaderboard</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Player</th>
+                    <th>Games Played</th>
+                    <th>Stones Won</th>
+                    <th>Average Trump Value</th>
+                    <th>Win Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for player in players %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ player.name }}</td>
+                    <td>{{ player.games_played }}</td>
+                    <td>{{ player.stones_won }}</td>
+                    <td>{{ player.average_trump_value }}</td>
+                    <td>{{ player.win_rate }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <a href="{{ url_for('dashboard') }}" class="btn">Back to Dashboard</a>
+    </div>
+</body>
+</html>

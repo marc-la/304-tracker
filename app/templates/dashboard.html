@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>304Tracker Dashboard</title>
+</head>
+<body>
+    {% include 'base.html' %}
+    <div class="container">
+        <h1>Dashboard</h1>
+        <div class="stats">
+            <h2>Player Statistics</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Player</th>
+                        <th>Games Played</th>
+                        <th>Stones Won</th>
+                        <th>Average Trump Value</th>
+                        <th>Win Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for player in players %}
+                    <tr>
+                        <td>{{ player.name }}</td>
+                        <td>{{ player.games_played }}</td>
+                        <td>{{ player.stones_won }}</td>
+                        <td>{{ player.average_trump_value }}</td>
+                        <td>{{ player.win_rate }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="leaderboard">
+            <h2>Leaderboard</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>Total Points</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for player in leaderboard %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ player.name }}</td>
+                        <td>{{ player.total_points }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // Real-time updates can be implemented here using Socket.IO
+    </script>
+</body>
+</html>

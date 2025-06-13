@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}304Tracker{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('auth.login') }}">Login</a></li>
+                <li><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('game.log') }}">Game Log</a></li>
+                <li><a href="{{ url_for('leaderboard.index') }}">Leaderboard</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <ul class="flashes">
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+    <footer>
+        <p>&copy; 2023 304Tracker. All rights reserved.</p>
+    </footer>
+</body>
+</html>
