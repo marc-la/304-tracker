@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Sign Up - 304Tracker{% endblock %}
+{% block content %}
+<h2>Sign Up</h2>
+<form method="POST" action="{{ url_for('auth.signup') }}">
+    {{ form.hidden_tag() }}
+    <div>
+        {{ form.name.label }}<br>
+        {{ form.name(size=32) }}
+        {% for error in form.name.errors %}
+            <span class="error">{{ error }}</span>
+        {% endfor %}
+    </div>
+    <div>
+        {{ form.email.label }}<br>
+        {{ form.email(size=32) }}
+        {% for error in form.email.errors %}
+            <span class="error">{{ error }}</span>
+        {% endfor %}
+    </div>
+    <div>
+        {{ form.password.label }}<br>
+        {{ form.password(size=32) }}
+        {% for error in form.password.errors %}
+            <span class="error">{{ error }}</span>
+        {% endfor %}
+    </div>
+    <div>
+        {{ form.confirm_password.label }}<br>
+        {{ form.confirm_password(size=32) }}
+        {% for error in form.confirm_password.errors %}
+            <span class="error">{{ error }}</span>
+        {% endfor %}
+    </div>
+    <div>
+        {{ form.submit(class="btn") }}
+    </div>
+    <p>
+        Already have an account? <a href="{{ url_for('auth.login') }}">Login</a>
+    </p>
+</form>
+{% endblock %}

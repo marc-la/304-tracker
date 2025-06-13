@@ -4,23 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <title>Login - 304Tracker</title>
+    <title>{% block title %}Login - 304Tracker{% endblock %}</title>
 </head>
 <body>
     <div class="container">
-        <h1>Login to 304Tracker</h1>
+        {% block content %}
+        <h2>Login</h2>
         <form method="POST" action="{{ url_for('auth.login') }}">
-            <div class="form-group">
-                <label for="email">Email:</label>
-                <input type="email" id="email" name="email" required>
+            {{ form.hidden_tag() }}
+            <div>
+                {{ form.email.label }}<br>
+                {{ form.email(size=32) }}
+                {% for error in form.email.errors %}
+                    <span class="error">{{ error }}</span>
+                {% endfor %}
             </div>
-            <div class="form-group">
-                <label for="password">Password:</label>
-                <input type="password" id="password" name="password" required>
+            <div>
+                {{ form.password.label }}<br>
+                {{ form.password(size=32) }}
+                {% for error in form.password.errors %}
+                    <span class="error">{{ error }}</span>
+                {% endfor %}
             </div>
-            <button type="submit">Login</button>
+            <div>
+                {{ form.submit(class="btn") }}
+            </div>
+            <p>
+                Don't have an account? <a href="{{ url_for('auth.signup') }}">Sign up</a>
+            </p>
         </form>
-        <p>Don't have an account? <a href="{{ url_for('auth.register') }}">Register here</a></p>
+        {% endblock %}
     </div>
 </body>
 </html>
