@@ -9,6 +9,15 @@
 <body>
     {% include 'base.html' %}
     <div class="container">
+        <!-- User info block for testing -->
+        {% if current_user.is_authenticated %}
+        <div class="card">
+            <h3>Logged in as: {{ current_user.name }} ({{ current_user.email }})</h3>
+            <p>User ID: {{ current_user.id }}</p>
+            <p>Email Confirmed: {{ current_user.email_confirmed }}</p>
+            <p>Role: {{ current_user.role }}</p>
+        </div>
+        {% endif %}
         <h1>Dashboard</h1>
         <div class="stats">
             <h2>Player Statistics</h2>

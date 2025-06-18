@@ -3,7 +3,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from flask_mail import Message
 from app import mail  # Ensure you initialize Flask-Mail in your app/__init__.py
 from app.models import db, User
-from app.forms import LoginForm, SignupForm
+from app.forms import LoginForm, SignupForm, RequestResetForm, ResetPasswordForm
 from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__)
@@ -76,4 +76,44 @@ def confirm_email(token):
         user.email_confirmed_at = datetime.utcnow()
         db.session.commit()
         flash('You have confirmed your account. Thanks!', 'success')
+    return redirect(url_for('auth.login'))
+
+@auth_bp.route('/reset_password', methods=['GET', 'POST'])
+def reset_request():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard.index'))
+    form = RequestResetForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user:
+            token = user.generate_reset_token()
+            reset_url = url_for('auth.reset_token', token=token, _external=True)
+            html = render_template('email/reset_password.html', reset_url=reset_url)
+            msg = Message('Password Reset Request', recipients=[user.email], html=html)
+            mail.send(msg)
+        flash('If your email is registered, you will receive a password reset link.', 'info')
+        return redirect(url_for('auth.login'))
+    return render_template('reset_request.html', form=form)
+
+@auth_bp.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_token(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard.index'))
+    user = User.verify_reset_token(token)
+    if not user:
+        flash('That is an invalid or expired token.', 'warning')
+        return redirect(url_for('auth.reset_request'))
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        user.set_password(form.password.data)
+        db.session.commit()
+        flash('Your password has been updated! You can now log in.', 'success')
+        return redirect(url_for('auth.login'))
+    return render_template('reset_token.html', form=form)
+
+@auth_bp.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out.', 'info')
     return redirect(url_for('auth.login'))

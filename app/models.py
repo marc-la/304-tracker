@@ -33,6 +33,19 @@ class User(db.Model, UserMixin):
             return None
         return email
 
+    def generate_reset_token(self, expires_sec=3600):
+        s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+        return s.dumps(self.email, salt='password-reset')
+
+    @staticmethod
+    def verify_reset_token(token, expires_sec=3600):
+        s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+        try:
+            email = s.loads(token, salt='password-reset', max_age=expires_sec)
+        except Exception:
+            return None
+        return User.query.filter_by(email=email).first()
+
 class Game(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)

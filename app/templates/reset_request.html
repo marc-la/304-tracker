@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Request Password Reset{% endblock %}
+{% block content %}
+<h2>Request Password Reset</h2>
+<form method="POST">
+    {{ form.hidden_tag() }}
+    {{ form.email.label }} {{ form.email(size=32) }}<br>
+    {{ form.submit() }}
+</form>
+{% endblock %}
