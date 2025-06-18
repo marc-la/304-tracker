@@ -2,12 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
-from flask_mail import Mail
-from app.models import db, User
-from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
-from itsdangerous import URLSafeTimedSerializer
-from flask import current_app
+from flask_mail import Mail 
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -20,10 +15,12 @@ def create_app():
 
     db.init_app(app)
     migrate.init_app(app, db)
-    mail.init_app(app)
-
     login_manager.login_view = 'auth.login'
     login_manager.init_app(app)
+    mail.init_app(app)
+
+    # Import models here, after db is initialized
+    from app.models import User
 
     @login_manager.user_loader
     def load_user(user_id):
