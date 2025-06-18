@@ -44,3 +44,8 @@ def get_game_stats(game_id):
 @login_required
 def game_log(game_id):
     return render_template('game_log.html', game_id=game_id)
+
+@game_bp.route('/log')
+def log():
+    # logic for general game log
+    return render_template('game_log.html')
