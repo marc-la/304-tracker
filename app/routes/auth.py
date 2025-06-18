@@ -15,18 +15,30 @@ def login():
         user = User.query.filter_by(email=form.email.data).first()
         if user and user.check_password(form.password.data):
             if not user.email_confirmed:
-                flash('Please confirm your email address first.', 'warning')
-                return redirect(url_for('auth.login'))
+                # Redirect to a dedicated page for unconfirmed users
+                return redirect(url_for('auth.unconfirmed', email=user.email))
             login_user(user)
+            flash(f'Welcome back, {user.name}! You have successfully logged in.', 'success')
             return redirect(url_for('dashboard.index'))
-        flash('Invalid email or password.')
+        flash('Invalid email or password.', 'danger')
     return render_template('login.html', form=form)
 
-@auth_bp.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    flash('You have been logged out.', 'info')
+@auth_bp.route('/unconfirmed')
+def unconfirmed():
+    email = request.args.get('email')
+    return render_template('unconfirmed.html', email=email)
+
+@auth_bp.route('/resend_confirmation')
+def resend_confirmation():
+    email = request.args.get('email')
+    user = User.query.filter_by(email=email).first()
+    if user and not user.email_confirmed:
+        token = user.generate_confirmation_token()
+        confirm_url = url_for('auth.confirm_email', token=token, _external=True)
+        html = render_template('email/activate.html', confirm_url=confirm_url)
+        msg = Message('Confirm Your Email', recipients=[user.email], html=html)
+        mail.send(msg)
+        flash('A new confirmation email has been sent. Please check your inbox.', 'info')
     return redirect(url_for('auth.login'))
 
 @auth_bp.route('/signup', methods=['GET', 'POST'])
@@ -34,7 +46,7 @@ def signup():
     form = SignupForm()
     if form.validate_on_submit():
         if User.query.filter_by(email=form.email.data).first():
-            flash('Email already registered.')
+            flash('Email already registered.', 'warning')
         else:
             user = User(name=form.name.data, email=form.email.data)
             user.set_password(form.password.data)
@@ -46,7 +58,7 @@ def signup():
             html = render_template('email/activate.html', confirm_url=confirm_url)
             msg = Message('Confirm Your Email', recipients=[user.email], html=html)
             mail.send(msg)
-            flash('A confirmation email has been sent. Please check your inbox.')
+            flash('Signup successful! Please check your email to confirm your account before logging in.', 'success')
             return redirect(url_for('auth.login'))
     return render_template('signup.html', form=form)
 
