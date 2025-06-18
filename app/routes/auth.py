@@ -34,7 +34,7 @@ def signup():
         # Send confirmation email asynchronously
         token = get_serializer().dumps(user.email, salt='email-confirm')
         confirm_url = url_for('auth.confirm_email', token=token, _external=True)
-        send_email_async(user.email, 'Confirm Your Email', 'email/confirm', confirm_url=confirm_url)
+        send_email_async(user.email, 'Confirm Your Email', 'email/activate', confirm_url=confirm_url)
         flash('A confirmation email has been sent. Please check your inbox.', 'info')
         logout_user()  # Ensure user is logged out until confirmed
         return redirect(url_for('auth.login'))

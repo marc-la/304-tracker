@@ -43,9 +43,11 @@ def create_app():
     from app.routes.auth import auth_bp
     from app.routes.game import game_bp
     from app.routes.dashboard import dashboard_bp
+    from app.routes.hero import hero_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(game_bp, url_prefix='/game')
     app.register_blueprint(dashboard_bp, url_prefix='/dashboard')
+    app.register_blueprint(hero_bp)
 
     return app

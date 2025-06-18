@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}304 Tracker - Tamil Card Game Analytics{% endblock %}
+{% block content %}
+<div class="hero-section" style="text-align:center; padding: 3em 1em;">
+    <h1>Welcome to 304 Tracker</h1>
+    <p style="font-size:1.2em; max-width:600px; margin:auto;">
+        Track your Tamil card game <strong>304</strong> results, analyze your performance, and see how you rank among friends and the community.
+        <br><br>
+        <strong>304 Tracker</strong> lets you:
+    </p>
+    <ul style="display:inline-block; text-align:left; margin:2em auto;">
+        <li>Log in and save your live game results</li>
+        <li>View a personal dashboard with your stats, win/loss ratio, and ELO rating</li>
+        <li>See a real-time leaderboard of the best 304 players</li>
+        <li>Quickly enter game data on mobile or desktop, even mid-game</li>
+        <li>Analyze detailed game history, bets, and team performance</li>
+    </ul>
+    <div style="margin:2em 0;">
+        <a href="{{ url_for('auth.signup') }}" class="btn" style="margin-right:1em;">Sign Up</a>
+        <a href="{{ url_for('auth.login') }}" class="btn">Log In</a>
+    </div>
+    <hr style="margin:2em auto; width:60%;">
+    <h2>How does it work?</h2>
+    <ol style="max-width:700px; margin:1em auto; text-align:left;">
+        <li>Create an account and log in</li>
+        <li>Start a new game and enter player teams, bets, and round results as you play</li>
+        <li>Let 304 Tracker handle stone allocation, caps, and scoring automatically</li>
+        <li>View your stats and see how you stack up on the leaderboard</li>
+    </ol>
+    <p style="margin-top:2em; color:#888;">
+        Built by and for 304 players. All backend logic is powered by Python.
+    </p>
+</div>
+{% endblock %}
