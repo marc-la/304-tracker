@@ -20,10 +20,20 @@ def log_game_action(action, player_id, game_id):
     logging.basicConfig(level=logging.INFO)
     logging.info(f'Action: {action}, Player ID: {player_id}, Game ID: {game_id}')
 
-def get_player_statistics(player_id):
-    # Implement your logic here
-    pass
+def get_player_statistics(player_id=None):
+    # Implement actual statistics gathering from database
+    # For now, return dummy data to prevent template errors
+    return [
+        {'name': 'Player 1', 'games_played': 10, 'stones_won': 25, 'average_trump_value': 190, 'win_rate': 65},
+        {'name': 'Player 2', 'games_played': 8, 'stones_won': 18, 'average_trump_value': 185, 'win_rate': 58},
+        {'name': 'Player 3', 'games_played': 12, 'stones_won': 20, 'average_trump_value': 175, 'win_rate': 42}
+    ]
 
 def get_leaderboard():
-    # Implement your logic here
-    pass
+    # Implement actual leaderboard data retrieval from database
+    # For now, return dummy data to prevent template errors
+    return [
+        {'name': 'Player 1', 'total_points': 350},
+        {'name': 'Player 2', 'total_points': 280},
+        {'name': 'Player 3', 'total_points': 220}
+    ]

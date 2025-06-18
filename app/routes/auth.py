@@ -123,29 +123,40 @@ def request_reset():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user:
-            token = get_serializer().dumps(user.email, salt='password-reset')
-            reset_url = url_for('auth.reset_password', token=token, _external=True)
-            send_email_async(user.email, 'Password Reset', 'email/reset_password', reset_url=reset_url)
-        flash('If your email is registered, you will receive a password reset link.', 'info')
+            token = user.generate_reset_token()
+            # Send email with password reset instructions
+            msg = Message('Password Reset Request',
+                          recipients=[user.email])
+            reset_url = url_for('auth.reset_token', token=token, _external=True)
+            msg.body = f'''To reset your password, visit the following link:
+{reset_url}
+            
+If you did not make this request, simply ignore this email and no changes will be made.
+'''
+            mail.send(msg)
+            current_app.logger.info(f"Password reset requested for {user.email}")
+        # Always show this message even if user doesn't exist (prevent user enumeration)
+        flash('If that email address exists, we have sent instructions to reset your password.', 'info')
         return redirect(url_for('auth.login'))
     return render_template('auth/request_reset.html', form=form)
 
 # --- Password Reset ---
 @auth_bp.route('/password/reset/<token>', methods=['GET', 'POST'])
-def reset_password(token):
+def reset_token(token):
     if current_user.is_authenticated:
         return redirect(url_for('dashboard.index'))
-    try:
-        email = get_serializer().loads(token, salt='password-reset', max_age=3600)
-    except (SignatureExpired, BadSignature):
-        flash('The reset link is invalid or has expired.', 'danger')
-        return redirect(url_for('auth.request_reset'))
-    user = User.query.filter_by(email=email).first_or_404()
+    
+    user = User.verify_reset_token(token)
+    if user is None:
+        flash('That is an invalid or expired token', 'warning')
+        return redirect(url_for('auth.reset_request'))
+    
     form = ResetPasswordForm()
     if form.validate_on_submit():
-        user.password_hash = generate_password_hash(form.password.data, method='pbkdf2:sha256', salt_length=16)
+        user.set_password(form.password.data)
         db.session.commit()
-        flash('Your password has been updated. Please log in.', 'success')
+        current_app.logger.info(f"Password reset successfully for {user.email}")
+        flash('Your password has been updated! You can now log in', 'success')
         return redirect(url_for('auth.login'))
     return render_template('auth/reset_password.html', form=form)
 

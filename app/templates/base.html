@@ -10,20 +10,25 @@
     <header>
         <nav>
             <ul>
-                <li><a href="{{ url_for('auth.login') }}">Login</a></li>
-                <li><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
-                <li><a href="{{ url_for('game.game_log', game_id=1) }}">Game Log</a></li> <!-- Replace 1 with dynamic game_id if available -->
-                <li><a href="{{ url_for('dashboard.leaderboard') }}">Leaderboard</a></li>
-                <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
+                {% if current_user.is_authenticated %}
+                    <li><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+                    <li><a href="{{ url_for('game.game_log', game_id=1) }}">Game Log</a></li>
+                    <li><a href="{{ url_for('dashboard.leaderboard') }}">Leaderboard</a></li>
+                    <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
+                {% else %}
+                    <li><a href="{{ url_for('hero.index') }}">Home</a></li>
+                    <li><a href="{{ url_for('auth.login') }}">Login</a></li>
+                    <li><a href="{{ url_for('auth.signup') }}">Sign Up</a></li>
+                {% endif %}
             </ul>
         </nav>
     </header>
     <main>
-        {% with messages = get_flashed_messages() %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <ul class="flashes">
-                {% for message in messages %}
-                    <li>{{ message }}</li>
+                {% for category, message in messages %}
+                    <li class="{{ category }}">{{ message }}</li>
                 {% endfor %}
                 </ul>
             {% endif %}
@@ -31,7 +36,7 @@
         {% block content %}{% endblock %}
     </main>
     <footer>
-        <p>&copy; 2023 304Tracker. All rights reserved.</p>
+        <p>&copy; 2025 304Tracker. All rights reserved.</p>
     </footer>
 </body>
 </html>

@@ -4,3 +4,5 @@ from flask import Blueprint
 from .auth import auth_bp
 from .dashboard import dashboard_bp
 from .game import game_bp
+from .hero import hero_bp
+

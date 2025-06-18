@@ -1,12 +1,16 @@
-from flask import Blueprint, render_template
-from flask_login import current_user, login_required
+from flask import Blueprint, render_template, redirect, url_for
+from flask_login import current_user
 
 hero_bp = Blueprint('hero', __name__)
 
 @hero_bp.route('/')
-def hero():
-    # If user is logged in, redirect to dashboard
+def index():
+    """Landing page route with conditional redirect for authenticated users"""
     if current_user.is_authenticated:
-        from flask import redirect, url_for
         return redirect(url_for('dashboard.index'))
-    return render_template('hero.html')
+    return render_template('index.html')
+
+@hero_bp.route('/home')
+def home():
+    """Home page redirect to landing page"""
+    return redirect(url_for('hero.index'))

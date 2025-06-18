@@ -38,3 +38,6 @@ var/
 # Virtual environment
 venv/
 ENV/
+
+# Log files
+*.log
