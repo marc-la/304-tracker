@@ -1,48 +1,40 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-*.egg-info/
-dist/
-build/
-
-# Flask & Python stuff
-instance/
-*.db
-*.sqlite3
-
-# Migrations (keep the folder, ignore generated files)
-migrations/versions/
-
 # Environment variables
 .env
 *.env
+.env.*
 
-# VS Code settings
+# Flask
+instance/
+.webassets-cache
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyCharm
+.idea/
+
+# VS Code
 .vscode/
 
-# OS files
-.DS_Store
-Thumbs.db
-
-# Pytest cache
-.pytest_cache/
-
-# Coverage reports
-htmlcov/
-.coverage
-.tox/
-
-# Logs
-*.log
+# Virtual environment
+venv/
+ENV/

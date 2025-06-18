@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
+from datetime import timedelta
 
-# Load environment variables from .env file
 load_dotenv()
 
 class Config:
@@ -15,8 +15,19 @@ class Config:
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
-    SESSION_COOKIE_SECURE = os.environ.get('FLASK_ENV') == 'production'  # Only send cookies over HTTPS
-    SESSION_COOKIE_HTTPONLY = True       # Prevent JavaScript access to cookies
-    REMEMBER_COOKIE_SECURE = os.environ.get('FLASK_ENV') == 'production'  # Only send remember-me cookies over HTTPS
-    REMEMBER_COOKIE_HTTPONLY = True      # Prevent JavaScript access to remember-me cookies
-    SESSION_COOKIE_SAMESITE = 'Lax'      # Helps protect against CSRF
+    
+    # Security settings
+    SESSION_COOKIE_SECURE = os.environ.get('FLASK_ENV') == 'production'
+    SESSION_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SECURE = os.environ.get('FLASK_ENV') == 'production'
+    REMEMBER_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
+    
+    # Account lockout duration
+    ACCOUNT_LOCKOUT_DURATION = timedelta(minutes=30)
+    
+    # Rate limiting defaults
+    RATELIMIT_DEFAULT = "100 per day, 20 per hour"
+    RATELIMIT_STRATEGY = "fixed-window"
+    RATELIMIT_STORAGE_URL = "memory://"

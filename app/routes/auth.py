@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -9,6 +9,7 @@ from app.forms import LoginForm, SignupForm, RequestResetForm, ResetPasswordForm
 from flask_mail import Message
 from threading import Thread
 import logging
+from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -67,13 +68,42 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
+        
+        # Check if account is locked
+        if user and user.account_locked_until and user.account_locked_until > datetime.utcnow():
+            current_app.logger.warning(f"Locked account login attempt: {user.email}")
+            flash('Account is temporarily locked due to multiple failed login attempts. Try again later.', 'danger')
+            return render_template('login.html', form=form)
+            
         if user and user.check_password(form.password.data):
             if not user.email_confirmed:
                 flash('Please confirm your email address first.', 'warning')
                 return redirect(url_for('auth.login'))
+            
+            # Record successful login
+            user.record_login(success=True)
+            
+            # Generate fresh session ID to prevent session fixation
+            session.clear()
             login_user(user)
-            return redirect(url_for('dashboard.index'))  # <-- FIXED
-        flash('Invalid email or password.')
+            
+            # Security logging
+            current_app.logger.info(f"Successful login: User {user.id} ({user.email})")
+            
+            next_page = request.args.get('next')
+            # Only redirect to 'next' if it's a relative path (security)
+            if next_page and not next_page.startswith('/'):
+                next_page = None
+                
+            return redirect(next_page or url_for('dashboard.index'))
+        elif user:
+            # Record failed login
+            user.record_login(success=False)
+            current_app.logger.warning(f"Failed login attempt for user: {form.email.data}")
+        else:
+            current_app.logger.warning(f"Login attempt for non-existent user: {form.email.data}")
+            
+        flash('Invalid email or password.', 'danger')
     return render_template('login.html', form=form)
 
 # --- Logout ---

@@ -5,13 +5,6 @@ from app.utils import get_player_statistics, get_leaderboard
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
-
-@dashboard_bp.route('/')
-@login_required
-def index():
-    return render_template('dashboard.html')
-
-
 @dashboard_bp.route('/dashboard')
 @login_required
 def dashboard():
