@@ -1,14 +1,18 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, current_app, request
 from flask_login import login_user, logout_user, login_required, current_user
 from flask_mail import Message
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from app import mail  # Ensure you initialize Flask-Mail in your app/__init__.py
 from app.models import db, User
 from app.forms import LoginForm, SignupForm, RequestResetForm, ResetPasswordForm
 from datetime import datetime
+from app.extensions import limiter
 
 auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def login():
     form = LoginForm()
     if form.validate_on_submit():
