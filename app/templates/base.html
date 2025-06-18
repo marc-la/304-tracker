@@ -12,7 +12,7 @@
             <ul>
                 <li><a href="{{ url_for('auth.login') }}">Login</a></li>
                 <li><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
-                <li><a href="{{ url_for('game.log') }}">Game Log</a></li>
+                <li><a href="{{ url_for('game.game_log', game_id=1) }}">Game Log</a></li> <!-- Replace 1 with dynamic game_id if available -->
                 <li><a href="{{ url_for('dashboard.leaderboard') }}">Leaderboard</a></li>
                 <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
             </ul>

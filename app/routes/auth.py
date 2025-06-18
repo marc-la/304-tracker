@@ -2,14 +2,12 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_user, logout_user, login_required, current_user
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.extensions import db, limiter
+from app import db, mail
+from app.extensions import limiter
 from app.models import User
 from app.forms import LoginForm, SignupForm, RequestResetForm, ResetPasswordForm
-from app.email import send_email_async  # You should implement async email sending
 from flask_mail import Message
 from threading import Thread
-from flask import current_app
-from app import mail
 import logging
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -22,11 +20,15 @@ def get_serializer():
 @auth_bp.route('/signup', methods=['GET', 'POST'])
 def signup():
     if current_user.is_authenticated:
-        return redirect(url_for('main.index'))
+        return redirect(url_for('dashboard.index'))
     form = SignupForm()
     if form.validate_on_submit():
         hashed_password = generate_password_hash(form.password.data, method='pbkdf2:sha256', salt_length=16)
-        user = User(email=form.email.data, password_hash=hashed_password)
+        user = User(
+            name=form.name.data,  # <-- restore name
+            email=form.email.data,
+            password_hash=hashed_password
+        )
         db.session.add(user)
         db.session.commit()
         # Send confirmation email asynchronously
@@ -48,32 +50,30 @@ def confirm_email(token):
         logout_user()
         return redirect(url_for('auth.login'))
     user = User.query.filter_by(email=email).first_or_404()
-    if user.confirmed:
+    if user.email_confirmed:  # <-- fix here
         flash('Account already confirmed. Please login.', 'info')
     else:
-        user.confirmed = True
+        user.email_confirmed = True  # <-- fix here
         db.session.commit()
         flash('Your account has been confirmed. You can now log in.', 'success')
     return redirect(url_for('auth.login'))
 
 # --- Login ---
 @auth_bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('main.index'))
+        return redirect(url_for('dashboard.index'))
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
-        if user and check_password_hash(user.password_hash, form.password.data):
-            if not user.confirmed:
-                flash('Please confirm your email before logging in.', 'warning')
+        if user and user.check_password(form.password.data):
+            if not user.email_confirmed:
+                flash('Please confirm your email address first.', 'warning')
                 return redirect(url_for('auth.login'))
-            login_user(user, remember=form.remember.data)
-            flash('Logged in successfully.', 'success')
-            return redirect(url_for('main.index'))
-        flash('Invalid email or password.', 'danger')
-    return render_template('auth/login.html', form=form)
+            login_user(user)
+            return redirect(url_for('dashboard.index'))  # <-- FIXED
+        flash('Invalid email or password.')
+    return render_template('login.html', form=form)
 
 # --- Logout ---
 @auth_bp.route('/logout')
@@ -87,7 +87,7 @@ def logout():
 @auth_bp.route('/password/reset', methods=['GET', 'POST'])
 def request_reset():
     if current_user.is_authenticated:
-        return redirect(url_for('main.index'))
+        return redirect(url_for('dashboard.index'))
     form = RequestResetForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
@@ -103,7 +103,7 @@ def request_reset():
 @auth_bp.route('/password/reset/<token>', methods=['GET', 'POST'])
 def reset_password(token):
     if current_user.is_authenticated:
-        return redirect(url_for('main.index'))
+        return redirect(url_for('dashboard.index'))
     try:
         email = get_serializer().loads(token, salt='password-reset', max_age=3600)
     except (SignatureExpired, BadSignature):

@@ -2,9 +2,9 @@ from flask import Blueprint, request, jsonify, render_template
 from app.models import Game, Stone, db
 from flask_login import login_required, current_user
 
-game_bp = Blueprint('game', __name__)
+game_bp = Blueprint('game', __name__, url_prefix='/game')
 
-@game_bp.route('/game/start', methods=['POST'])
+@game_bp.route('/start', methods=['POST'])
 @login_required
 def start_game():
     data = request.json
@@ -13,7 +13,7 @@ def start_game():
     db.session.commit()
     return jsonify({'message': 'Game started', 'game_id': new_game.id}), 201
 
-@game_bp.route('/game/<int:game_id>/log_stone', methods=['POST'])
+@game_bp.route('/<int:game_id>/log_stone', methods=['POST'])
 @login_required
 def log_stone(game_id):
     data = request.json
@@ -28,7 +28,7 @@ def log_stone(game_id):
     db.session.commit()
     return jsonify({'message': 'Stone logged', 'stone_id': new_stone.id}), 201
 
-@game_bp.route('/game/<int:game_id>/stats', methods=['GET'])
+@game_bp.route('/<int:game_id>/stats', methods=['GET'])
 @login_required
 def get_game_stats(game_id):
     game = Game.query.get_or_404(game_id)
@@ -40,7 +40,7 @@ def get_game_stats(game_id):
     }
     return jsonify(stats), 200
 
-@game_bp.route('/game/<int:game_id>/log', methods=['GET'])
+@game_bp.route('/<int:game_id>/log', methods=['GET'])
 @login_required
 def game_log(game_id):
     return render_template('game_log.html', game_id=game_id)
