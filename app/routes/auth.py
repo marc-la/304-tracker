@@ -60,6 +60,7 @@ def confirm_email(token):
 
 # --- Login ---
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")  # Apply rate limiting
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard.index'))
