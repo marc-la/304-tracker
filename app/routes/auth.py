@@ -1,145 +1,133 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, current_app, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_user, logout_user, login_required, current_user
-from flask_mail import Message
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from app import mail  # Ensure you initialize Flask-Mail in your app/__init__.py
-from app.models import db, User
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from werkzeug.security import generate_password_hash, check_password_hash
+from app.extensions import db, limiter
+from app.models import User
 from app.forms import LoginForm, SignupForm, RequestResetForm, ResetPasswordForm
-from datetime import datetime
-from app.extensions import limiter
+from app.email import send_email_async  # You should implement async email sending
+from flask_mail import Message
+from threading import Thread
+from flask import current_app
+from app import mail
 import logging
 
-# Configure logging (you can adjust filename and level as needed)
-logging.basicConfig(
-    filename='auth_events.log',
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-)
-logger = logging.getLogger(__name__)
+auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
-auth_bp = Blueprint('auth', __name__)
+# Serializer for tokens
+def get_serializer():
+    return URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
 
+# --- Signup ---
+@auth_bp.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.index'))
+    form = SignupForm()
+    if form.validate_on_submit():
+        hashed_password = generate_password_hash(form.password.data, method='pbkdf2:sha256', salt_length=16)
+        user = User(email=form.email.data, password_hash=hashed_password)
+        db.session.add(user)
+        db.session.commit()
+        # Send confirmation email asynchronously
+        token = get_serializer().dumps(user.email, salt='email-confirm')
+        confirm_url = url_for('auth.confirm_email', token=token, _external=True)
+        send_email_async(user.email, 'Confirm Your Email', 'email/confirm', confirm_url=confirm_url)
+        flash('A confirmation email has been sent. Please check your inbox.', 'info')
+        logout_user()  # Ensure user is logged out until confirmed
+        return redirect(url_for('auth.login'))
+    return render_template('auth/signup.html', form=form)
+
+# --- Email Confirmation ---
+@auth_bp.route('/confirm/<token>')
+def confirm_email(token):
+    try:
+        email = get_serializer().loads(token, salt='email-confirm', max_age=3600)
+    except (SignatureExpired, BadSignature):
+        flash('The confirmation link is invalid or has expired.', 'danger')
+        logout_user()
+        return redirect(url_for('auth.login'))
+    user = User.query.filter_by(email=email).first_or_404()
+    if user.confirmed:
+        flash('Account already confirmed. Please login.', 'info')
+    else:
+        user.confirmed = True
+        db.session.commit()
+        flash('Your account has been confirmed. You can now log in.', 'success')
+    return redirect(url_for('auth.login'))
+
+# --- Login ---
 @auth_bp.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.index'))
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
-        if user and user.check_password(form.password.data):
-            if not user.email_confirmed:
-                logger.info(f"Login attempt with unconfirmed email: {user.email}")
-                return redirect(url_for('auth.unconfirmed', email=user.email))
-            login_user(user)
-            logger.info(f"User logged in: {user.email} (id={user.id})")
-            flash(f'Welcome back, {user.name}! You have successfully logged in.', 'success')
-            return redirect(url_for('dashboard.index'))
-        logger.warning(f"Failed login attempt for email: {form.email.data}")
+        if user and check_password_hash(user.password_hash, form.password.data):
+            if not user.confirmed:
+                flash('Please confirm your email before logging in.', 'warning')
+                return redirect(url_for('auth.login'))
+            login_user(user, remember=form.remember.data)
+            flash('Logged in successfully.', 'success')
+            return redirect(url_for('main.index'))
         flash('Invalid email or password.', 'danger')
-    return render_template('login.html', form=form)
+    return render_template('auth/login.html', form=form)
 
-@auth_bp.route('/unconfirmed')
-def unconfirmed():
-    email = request.args.get('email')
-    return render_template('unconfirmed.html', email=email)
-
-@auth_bp.route('/resend_confirmation')
-def resend_confirmation():
-    email = request.args.get('email')
-    user = User.query.filter_by(email=email).first()
-    if user and not user.email_confirmed:
-        token = user.generate_confirmation_token()
-        confirm_url = url_for('auth.confirm_email', token=token, _external=True)
-        html = render_template('email/activate.html', confirm_url=confirm_url)
-        msg = Message('Confirm Your Email', recipients=[user.email], html=html)
-        mail.send(msg)
-        flash('A new confirmation email has been sent. Please check your inbox.', 'info')
-        logger.info(f'Resent confirmation email to {user.email}.')
+# --- Logout ---
+@auth_bp.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out.', 'info')
     return redirect(url_for('auth.login'))
 
-@auth_bp.route('/signup', methods=['GET', 'POST'])
-def signup():
-    form = SignupForm()
-    if form.validate_on_submit():
-        if User.query.filter_by(email=form.email.data).first():
-            logger.warning(f"Signup attempt with existing email: {form.email.data}")
-            flash('Email already registered.', 'warning')
-        else:
-            user = User(name=form.name.data, email=form.email.data)
-            user.set_password(form.password.data)
-            db.session.add(user)
-            db.session.commit()
-            logger.info(f"New user signed up: {user.email} (id={user.id})")
-            # Send confirmation email
-            token = user.generate_confirmation_token()
-            confirm_url = url_for('auth.confirm_email', token=token, _external=True)
-            html = render_template('email/activate.html', confirm_url=confirm_url)
-            msg = Message('Confirm Your Email', recipients=[user.email], html=html)
-            mail.send(msg)
-            flash('Signup successful! Please check your email to confirm your account before logging in.', 'success')
-            return redirect(url_for('auth.login'))
-    return render_template('signup.html', form=form)
-
-@auth_bp.route('/confirm/<token>')
-def confirm_email(token):
-    email = User.confirm_token(token)
-    if not email:
-        flash('The confirmation link is invalid or has expired.', 'danger')
-        logger.warning('Invalid confirmation link attempted.')
-        return redirect(url_for('auth.login'))
-    user = User.query.filter_by(email=email).first_or_404()
-    if user.email_confirmed:
-        flash('Account already confirmed. Please login.', 'success')
-    else:
-        user.email_confirmed = True
-        user.email_confirmed_at = datetime.utcnow()
-        db.session.commit()
-        flash('You have confirmed your account. Thanks!', 'success')
-        logger.info(f'Email confirmed for user: {user.email}.')
-    return redirect(url_for('auth.login'))
-
-@auth_bp.route('/reset_password', methods=['GET', 'POST'])
-def reset_request():
+# --- Request Password Reset ---
+@auth_bp.route('/password/reset', methods=['GET', 'POST'])
+def request_reset():
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard.index'))
+        return redirect(url_for('main.index'))
     form = RequestResetForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user:
-            token = user.generate_reset_token()
-            reset_url = url_for('auth.reset_token', token=token, _external=True)
-            html = render_template('email/reset_password.html', reset_url=reset_url)
-            msg = Message('Password Reset Request', recipients=[user.email], html=html)
-            mail.send(msg)
-            logger.info(f"Password reset requested for: {user.email} (id={user.id})")
-        else:
-            logger.warning(f"Password reset requested for non-existent email: {form.email.data}")
+            token = get_serializer().dumps(user.email, salt='password-reset')
+            reset_url = url_for('auth.reset_password', token=token, _external=True)
+            send_email_async(user.email, 'Password Reset', 'email/reset_password', reset_url=reset_url)
         flash('If your email is registered, you will receive a password reset link.', 'info')
         return redirect(url_for('auth.login'))
-    return render_template('reset_request.html', form=form)
+    return render_template('auth/request_reset.html', form=form)
 
-@auth_bp.route('/reset_password/<token>', methods=['GET', 'POST'])
-def reset_token(token):
+# --- Password Reset ---
+@auth_bp.route('/password/reset/<token>', methods=['GET', 'POST'])
+def reset_password(token):
     if current_user.is_authenticated:
-        return redirect(url_for('dashboard.index'))
-    user = User.verify_reset_token(token)
-    if not user:
-        logger.warning(f"Invalid or expired password reset token used.")
-        flash('That is an invalid or expired token.', 'warning')
-        return redirect(url_for('auth.reset_request'))
+        return redirect(url_for('main.index'))
+    try:
+        email = get_serializer().loads(token, salt='password-reset', max_age=3600)
+    except (SignatureExpired, BadSignature):
+        flash('The reset link is invalid or has expired.', 'danger')
+        return redirect(url_for('auth.request_reset'))
+    user = User.query.filter_by(email=email).first_or_404()
     form = ResetPasswordForm()
     if form.validate_on_submit():
-        user.set_password(form.password.data)
+        user.password_hash = generate_password_hash(form.password.data, method='pbkdf2:sha256', salt_length=16)
         db.session.commit()
-        logger.info(f"Password reset for user: {user.email} (id={user.id})")
-        flash('Your password has been updated! You can now log in.', 'success')
+        flash('Your password has been updated. Please log in.', 'success')
         return redirect(url_for('auth.login'))
-    return render_template('reset_token.html', form=form)
+    return render_template('auth/reset_password.html', form=form)
 
-@auth_bp.route('/logout')
-@login_required
-def logout():
-    logger.info(f"User logged out: {current_user.email} (id={current_user.id})")
-    logout_user()
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('auth.login'))
+# --- Email sending functions ---
+def send_async_email(app, msg):
+    with app.app_context():
+        mail.send(msg)
+
+def send_email_async(to, subject, template, **kwargs):
+    app = current_app._get_current_object()
+    msg = Message(subject, recipients=[to])
+    msg.body = render_template(template + '.txt', **kwargs)
+    msg.html = render_template(template + '.html', **kwargs)
+    Thread(target=send_async_email, args=(app, msg)).start()
+
+# --- End of auth routes ---

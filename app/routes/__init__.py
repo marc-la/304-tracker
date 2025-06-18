@@ -1,9 +1,6 @@
 from flask import Blueprint
 
-# Initialize the routes blueprint
-routes_bp = Blueprint('routes', __name__)
-
-# Import the individual route modules
-from .auth import *
-from .game import *
-from .dashboard import *
+# Remove routes_bp and just import blueprints for registration in app/__init__.py
+from .auth import auth_bp
+from .game import game_bp
+from .dashboard import dashboard_bp

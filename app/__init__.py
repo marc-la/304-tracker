@@ -5,6 +5,7 @@ from flask_login import LoginManager
 from flask_mail import Mail 
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import logging
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -12,9 +13,17 @@ login_manager = LoginManager()
 mail = Mail()
 limiter = Limiter(key_func=get_remote_address)
 
+def configure_logging(app):
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    )
+    app.logger = logging.getLogger(__name__)
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object('config.Config')
+    configure_logging(app)
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -31,12 +40,12 @@ def create_app():
     def load_user(user_id):
         return User.query.get(int(user_id))
 
-    from app.routes.auth import auth_bp as auth_blueprint
-    from app.routes.game import game_bp as game_blueprint
-    from app.routes.dashboard import dashboard_bp as dashboard_blueprint
+    from app.routes.auth import auth_bp
+    from app.routes.game import game_bp
+    from app.routes.dashboard import dashboard_bp
 
-    app.register_blueprint(auth_blueprint)
-    app.register_blueprint(game_blueprint)
-    app.register_blueprint(dashboard_blueprint)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(game_bp)
+    app.register_blueprint(dashboard_bp)
 
     return app

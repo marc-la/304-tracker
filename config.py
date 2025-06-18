@@ -15,8 +15,8 @@ class Config:
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
-    SESSION_COOKIE_SECURE = False         # Only send cookies over HTTPS
+    SESSION_COOKIE_SECURE = os.environ.get('FLASK_ENV') == 'production'  # Only send cookies over HTTPS
     SESSION_COOKIE_HTTPONLY = True       # Prevent JavaScript access to cookies
-    REMEMBER_COOKIE_SECURE = True        # Only send remember-me cookies over HTTPS
+    REMEMBER_COOKIE_SECURE = os.environ.get('FLASK_ENV') == 'production'  # Only send remember-me cookies over HTTPS
     REMEMBER_COOKIE_HTTPONLY = True      # Prevent JavaScript access to remember-me cookies
     SESSION_COOKIE_SAMESITE = 'Lax'      # Helps protect against CSRF
