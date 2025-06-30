@@ -12,7 +12,7 @@
             <ul>
                 {% if current_user.is_authenticated %}
                     <li><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
-                    <li><a href="{{ url_for('game.game_log', game_id=1) }}">Game Log</a></li>
+                    {# <li><a href="{{ url_for('game.game_log', game_id=1) }}">Game Log</a></li> #}
                     <li><a href="{{ url_for('dashboard.leaderboard') }}">Leaderboard</a></li>
                     <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
                 {% else %}
