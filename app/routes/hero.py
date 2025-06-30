@@ -9,8 +9,3 @@ def index():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard.index'))
     return render_template('index.html')
-
-@hero_bp.route('/home')
-def home():
-    """Home page redirect to landing page"""
-    return redirect(url_for('hero.index'))
