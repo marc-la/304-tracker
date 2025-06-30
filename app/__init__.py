@@ -27,14 +27,12 @@ def create_app():
 
     # Register blueprints
     from app.routes.auth import auth_bp
-    from app.routes.game import game_bp
     from app.routes.dashboard import dashboard_bp
     from app.routes.hero import hero_bp
     
-    app.register_blueprint(hero_bp)  # No url_prefix for hero routes
+    app.register_blueprint(hero_bp) 
     app.register_blueprint(auth_bp, url_prefix='/auth')
-    app.register_blueprint(game_bp)  # No prefix since routes include /game
-    app.register_blueprint(dashboard_bp)  # No prefix since routes include /dashboard
+    app.register_blueprint(dashboard_bp)  
     
     # Add favicon route to prevent 404/500 errors
     @app.route('/favicon.ico')
