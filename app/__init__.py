@@ -1,18 +1,10 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, redirect
 import logging
 from .extensions import db, migrate, login_manager, mail, limiter, csrf
-
-def configure_logging(app):
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-    )
-    app.logger = logging.getLogger(__name__)
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object('config.Config')
-    configure_logging(app)
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -44,6 +36,12 @@ def create_app():
     app.register_blueprint(game_bp)  # No prefix since routes include /game
     app.register_blueprint(dashboard_bp)  # No prefix since routes include /dashboard
     
+    # Add favicon route to prevent 404/500 errors
+    @app.route('/favicon.ico')
+    def favicon():
+        from flask import Response
+        return Response(status=204)
+
     # Add security headers to all responses
     @app.after_request
     def add_security_headers(response):
@@ -53,6 +51,13 @@ def create_app():
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' https://code.jquery.com; style-src 'self'"
         return response
+
+    # Enforce HTTPS in production
+    @app.before_request
+    def enforce_https():
+        if app.config.get('ENV') == 'production' and not request.is_secure:
+            url = request.url.replace('http://', 'https://', 1)
+            return redirect(url, code=301)
     
     # Global error handler
     @app.errorhandler(Exception)

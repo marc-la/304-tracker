@@ -9,16 +9,26 @@ from app.forms import LoginForm, SignupForm, RequestResetForm, ResetPasswordForm
 from flask_mail import Message
 from threading import Thread
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+import hashlib
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 # Serializer for tokens
-def get_serializer():
-    return URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+def get_serializer(user=None, purpose=None):
+    # Use a unique salt per user and purpose for extra security
+    base_salt = current_app.config['SECRET_KEY']
+    if user and purpose:
+        salt = hashlib.sha256((str(user.id) + user.email + purpose + base_salt).encode()).hexdigest()
+    elif user:
+        salt = hashlib.sha256((str(user.id) + user.email + base_salt).encode()).hexdigest()
+    else:
+        salt = base_salt
+    return URLSafeTimedSerializer(current_app.config['SECRET_KEY']), salt
 
 # --- Signup ---
 @auth_bp.route('/signup', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")  # Rate limit signup
 def signup():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard.index'))
@@ -26,14 +36,15 @@ def signup():
     if form.validate_on_submit():
         hashed_password = generate_password_hash(form.password.data, method='pbkdf2:sha256', salt_length=16)
         user = User(
-            name=form.name.data,  # <-- restore name
+            name=form.name.data,
             email=form.email.data,
             password_hash=hashed_password
         )
         db.session.add(user)
         db.session.commit()
         # Send confirmation email asynchronously
-        token = get_serializer().dumps(user.email, salt='email-confirm')
+        serializer, salt = get_serializer(user, 'email-confirm')
+        token = serializer.dumps(user.email, salt=salt)
         confirm_url = url_for('auth.confirm_email', token=token, _external=True)
         send_email_async(user.email, 'Confirm Your Email', 'email/activate', confirm_url=confirm_url)
         flash('A confirmation email has been sent. Please check your inbox.', 'info')
@@ -44,17 +55,28 @@ def signup():
 # --- Email Confirmation ---
 @auth_bp.route('/confirm/<token>')
 def confirm_email(token):
+    # User enumeration protection: generic error message
+    user = None
     try:
-        email = get_serializer().loads(token, salt='email-confirm', max_age=3600)
-    except (SignatureExpired, BadSignature):
+        # Try all users (slow, but avoids enumeration)
+        for u in User.query.all():
+            serializer, salt = get_serializer(u, 'email-confirm')
+            try:
+                email = serializer.loads(token, salt=salt, max_age=3600)
+                user = u
+                break
+            except Exception:
+                continue
+    except Exception:
+        pass
+    if not user:
         flash('The confirmation link is invalid or has expired.', 'danger')
         logout_user()
         return redirect(url_for('auth.login'))
-    user = User.query.filter_by(email=email).first_or_404()
-    if user.email_confirmed:  # <-- fix here
+    if user.email_confirmed:
         flash('Account already confirmed. Please login.', 'info')
     else:
-        user.email_confirmed = True  # <-- fix here
+        user.email_confirmed = True
         db.session.commit()
         flash('Your account has been confirmed. You can now log in.', 'success')
     return redirect(url_for('auth.login'))
@@ -68,42 +90,36 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
-        
         # Check if account is locked
         if user and user.account_locked_until and user.account_locked_until > datetime.utcnow():
             current_app.logger.warning(f"Locked account login attempt: {user.email}")
             flash('Account is temporarily locked due to multiple failed login attempts. Try again later.', 'danger')
             return render_template('login.html', form=form)
-            
+        # MFA placeholder (future):
+        # if user and user.mfa_enabled:
+        #     return redirect(url_for('auth.mfa', user_id=user.id))
         if user and user.check_password(form.password.data):
             if not user.email_confirmed:
                 flash('Please confirm your email address first.', 'warning')
-                return redirect(url_for('auth.login'))
-            
-            # Record successful login
-            user.record_login(success=True)
-            
-            # Generate fresh session ID to prevent session fixation
-            session.clear()
-            login_user(user)
-            
-            # Security logging
-            current_app.logger.info(f"Successful login: User {user.id} ({user.email})")
-            
-            next_page = request.args.get('next')
-            # Only redirect to 'next' if it's a relative path (security)
-            if next_page and not next_page.startswith('/'):
-                next_page = None
-                
-            return redirect(next_page or url_for('dashboard.index'))
-        elif user:
-            # Record failed login
-            user.record_login(success=False)
-            current_app.logger.warning(f"Failed login attempt for user: {form.email.data}")
+                return render_template('login.html', form=form)
+            # Reset failed attempts
+            user.failed_login_attempts = 0
+            user.account_locked_until = None
+            user.last_login = datetime.utcnow()
+            db.session.commit()
+            login_user(user, remember=form.remember.data)
+            return redirect(url_for('dashboard.index'))
         else:
-            current_app.logger.warning(f"Login attempt for non-existent user: {form.email.data}")
-            
-        flash('Invalid email or password.', 'danger')
+            # Increment failed attempts and lock if needed
+            if user:
+                user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+                lockout_threshold = 5
+                if user.failed_login_attempts >= lockout_threshold:
+                    user.account_locked_until = datetime.utcnow() + timedelta(minutes=30)
+                db.session.commit()
+            # User enumeration protection: generic error
+            flash('Invalid email or password.', 'danger')
+            return render_template('login.html', form=form)
     return render_template('login.html', form=form)
 
 # --- Logout ---
@@ -116,49 +132,44 @@ def logout():
 
 # --- Request Password Reset ---
 @auth_bp.route('/password/reset', methods=['GET', 'POST'])
+@limiter.limit("3 per minute")  # Rate limit password reset requests
 def request_reset():
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard.index'))
     form = RequestResetForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
+        # Always show same message to avoid user enumeration
         if user:
-            token = user.generate_reset_token()
-            # Send email with password reset instructions
-            msg = Message('Password Reset Request',
-                          recipients=[user.email])
+            serializer, salt = get_serializer(user, 'password-reset')
+            token = serializer.dumps(user.email, salt=salt)
             reset_url = url_for('auth.reset_token', token=token, _external=True)
-            msg.body = f'''To reset your password, visit the following link:
-{reset_url}
-            
-If you did not make this request, simply ignore this email and no changes will be made.
-'''
-            mail.send(msg)
-            current_app.logger.info(f"Password reset requested for {user.email}")
-        # Always show this message even if user doesn't exist (prevent user enumeration)
-        flash('If that email address exists, we have sent instructions to reset your password.', 'info')
+            send_email_async(user.email, 'Password Reset Request', 'email/reset_password', reset_url=reset_url)
+        flash('If your email is registered, you will receive a password reset link.', 'info')
         return redirect(url_for('auth.login'))
     return render_template('auth/request_reset.html', form=form)
 
 # --- Password Reset ---
 @auth_bp.route('/password/reset/<token>', methods=['GET', 'POST'])
+@limiter.limit("3 per minute")  # Rate limit password reset
 def reset_token(token):
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard.index'))
-    
-    user = User.verify_reset_token(token)
-    if user is None:
-        flash('That is an invalid or expired token', 'warning')
-        return redirect(url_for('auth.reset_request'))
-    
+    user = None
+    for u in User.query.all():
+        serializer, salt = get_serializer(u, 'password-reset')
+        try:
+            email = serializer.loads(token, salt=salt, max_age=3600)
+            user = u
+            break
+        except Exception:
+            continue
+    if not user:
+        flash('The password reset link is invalid or has expired.', 'danger')
+        return redirect(url_for('auth.request_reset'))
     form = ResetPasswordForm()
     if form.validate_on_submit():
         user.set_password(form.password.data)
         db.session.commit()
-        current_app.logger.info(f"Password reset successfully for {user.email}")
-        flash('Your password has been updated! You can now log in', 'success')
+        flash('Your password has been updated. You can now log in.', 'success')
         return redirect(url_for('auth.login'))
-    return render_template('auth/reset_password.html', form=form)
+    return render_template('auth/reset_token.html', form=form)
 
 # --- Email sending functions ---
 def send_async_email(app, msg):
@@ -173,3 +184,4 @@ def send_email_async(to, subject, template, **kwargs):
     Thread(target=send_async_email, args=(app, msg)).start()
 
 # --- End of auth routes ---
+# Note: For production, implement MFA (TOTP) and consider using Flask-Talisman for advanced security headers and HTTPS enforcement.

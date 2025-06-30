@@ -2,6 +2,7 @@ from .extensions import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer
+import hashlib
 from flask import current_app
 from datetime import datetime, timedelta  # Add timedelta import
 
@@ -29,29 +30,39 @@ class User(db.Model, UserMixin):
 
     def generate_confirmation_token(self):
         serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
-        return serializer.dumps(self.email, salt='email-confirm')
+        salt = hashlib.sha256((str(self.id) + self.email + 'email-confirm' + current_app.config['SECRET_KEY']).encode()).hexdigest()
+        return serializer.dumps(self.email, salt=salt)
 
     @staticmethod
     def confirm_token(token, expiration=3600):
-        serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
-        try:
-            email = serializer.loads(token, salt='email-confirm', max_age=expiration)
-        except Exception:
-            return None
-        return email
+        from app.models import User
+        for user in User.query.all():
+            serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+            salt = hashlib.sha256((str(user.id) + user.email + 'email-confirm' + current_app.config['SECRET_KEY']).encode()).hexdigest()
+            try:
+                email = serializer.loads(token, salt=salt, max_age=expiration)
+                return email
+            except Exception:
+                continue
+        return None
 
     def generate_reset_token(self, expires_sec=3600):
-        s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
-        return s.dumps(self.email, salt='password-reset')
+        serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+        salt = hashlib.sha256((str(self.id) + self.email + 'password-reset' + current_app.config['SECRET_KEY']).encode()).hexdigest()
+        return serializer.dumps(self.email, salt=salt)
 
     @staticmethod
     def verify_reset_token(token, expires_sec=3600):
-        s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
-        try:
-            email = s.loads(token, salt='password-reset', max_age=expires_sec)
-        except Exception:
-            return None
-        return User.query.filter_by(email=email).first()
+        from app.models import User
+        for user in User.query.all():
+            serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+            salt = hashlib.sha256((str(user.id) + user.email + 'password-reset' + current_app.config['SECRET_KEY']).encode()).hexdigest()
+            try:
+                email = serializer.loads(token, salt=salt, max_age=expires_sec)
+                return user
+            except Exception:
+                continue
+        return None
     
     def record_login(self, success=True):
         """Record login attempt"""
